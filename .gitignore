@@ -19,6 +19,16 @@ source/program1/stop
 source/program1/terminate
 source/program1/trap
 
+# Program2 kernel module files
+source/program2/*.ko
+source/program2/*.o
+source/program2/*.mod
+source/program2/*.mod.c
+source/program2/Module.symvers
+source/program2/modules.order
+source/program2/.*.cmd
+source/program2/test
+
 # General patterns for C/C++ compilation
 *.o
 *.obj
@@ -27,6 +37,14 @@ source/program1/trap
 *.a
 *.so
 *.dylib
+
+# Kernel module compilation files
+*.ko
+*.mod
+*.mod.c
+Module.symvers
+modules.order
+.*.cmd
 
 # Debug files
 *.dSYM/
