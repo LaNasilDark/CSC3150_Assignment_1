@@ -16,6 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/string.h>
 #include <linux/binfmts.h>
+#include <linux/delay.h>
 
 MODULE_LICENSE("GPL");
 
@@ -24,15 +25,62 @@ extern struct filename *getname(const char __user *filename);
 
 static struct task_struct *task;
 
+// 信号名称映射表
+static const char *signal_names[] = {
+    "UNKNOWN",   // 0: No signal 0
+    "SIGHUP",    // 1: Hangup
+    "SIGINT",    // 2: Interrupt from keyboard
+    "SIGQUIT",   // 3: Quit from keyboard
+    "SIGILL",    // 4: Illegal instruction
+    "SIGTRAP",   // 5: Trace/breakpoint trap
+    "SIGABRT",   // 6: Abort signal
+    "SIGBUS",    // 7: Bus error
+    "SIGFPE",    // 8: Floating-point exception
+    "SIGKILL",   // 9: Kill signal
+    "SIGUSR1",   // 10: User-defined signal 1
+    "SIGSEGV",   // 11: Segmentation fault
+    "SIGUSR2",   // 12: User-defined signal 2
+    "SIGPIPE",   // 13: Broken pipe
+    "SIGALRM",   // 14: Timer signal from alarm
+    "SIGTERM",   // 15: Termination signal
+    "SIGSTKFLT", // 16: Stack fault
+    "SIGCHLD",   // 17: Child stopped or terminated
+    "SIGCONT",   // 18: Continue if stopped
+    "SIGSTOP",   // 19: Stop process
+    "SIGTSTP",   // 20: Stop typed at terminal
+    "SIGTTIN",   // 21: Terminal input for background process
+    "SIGTTOU",   // 22: Terminal output for background process
+    "SIGURG",    // 23: Urgent condition on socket
+    "SIGXCPU",   // 24: CPU time limit exceeded
+    "SIGXFSZ",   // 25: File size limit exceeded
+    "SIGVTALRM", // 26: Virtual alarm clock
+    "SIGPROF",   // 27: Profiling timer expired
+    "SIGWINCH",  // 28: Window resize signal
+    "SIGIO",     // 29: I/O now possible
+    "SIGPWR",    // 30: Power failure
+    "SIGSYS"     // 31: Bad system call
+};
+
+// 获取信号名称的辅助函数
+static const char* get_signal_name(int sig) {
+    if (sig >= 0 && sig <= 31) {
+        return signal_names[sig];
+    }
+    return "UNKNOWN";
+}
+
 
 //implement fork function
 int my_fork(void *argc){
 	pid_t child_pid;
-	int status;
+	int status = 0;
+	int __user *status_ptr;
 	long retval;
 	struct kernel_clone_args args;
 	const char *const argv[] = { "/tmp/test", NULL };
 	const char *const envp[] = { "HOME=/", "PATH=/sbin:/bin:/usr/bin", NULL };
+	int termsig, coredump, sig, exit_code;
+	const char *sig_name;
 	
 	//set default sigaction for current process
 	int i;
@@ -74,25 +122,48 @@ int my_fork(void *argc){
 		printk("[program2] : The child process has pid = %d\n", child_pid);
 		printk("[program2] : This is the parent process, pid = %d\n", current->pid);
 		
-		/* wait until child process terminates */
-		retval = kernel_wait4(child_pid, NULL, 0, NULL);
-		
+		/* wait for child process */
+		// 在内核空间中，我们需要使用 __user 指针
+		// 最简单的方法是声明一个用户空间指针并使用它
+		status_ptr = (int __user *)&status;
+		retval = kernel_wait4(child_pid, status_ptr, 0, NULL);
 		if (retval < 0) {
-			printk("[program2] : wait4 failed: %ld\n", retval);
+			printk("[program2] : kernel_wait4 failed with error %ld\n", retval);
+			return retval;
+		}
+		
+		// 添加原始状态值的调试信息
+		printk("[program2] : Raw status value: 0x%x (%d)\n", status, status);
+		
+		// 检查进程退出状态
+		// WTERMSIG(status) 等同于 (status & 0x7f)
+		// WIFEXITED(status) 检查是否正常退出
+		// WIFSIGNALED(status) 检查是否被信号终止
+		
+		termsig = status & 0x7f;  // 终止信号
+		coredump = (status & 0x80) ? 1 : 0;  // core dump 标志
+		
+		printk("[program2] : termsig = %d, coredump = %d\n", termsig, coredump);
+		
+		// 如果 termsig 为 0，说明正常退出
+		// 如果 termsig 为 0x7f (127)，说明进程停止而非终止
+		if (termsig == 0) {
+			// 正常退出
+			exit_code = (status >> 8) & 0xff;
+			printk("[program2] : child process exited normally\n");
+			printk("[program2] : The exit code is %d\n", exit_code);
+		} else if (termsig == 0x7f) {
+			// 进程停止（不是终止）
+			printk("[program2] : child process stopped\n");
 		} else {
-			// 获取退出状态
-			status = (int)retval;
-			// 检查进程退出状态
-			if (status & 0x7f) {
-				// 被信号终止
-				int sig = status & 0x7f;
-				printk("[program2] : get SIGTERM signal\n");
-				printk("[program2] : child process terminated\n");
-				printk("[program2] : The return signal is %d\n", sig);
-			} else {
-				// 正常退出
-				int exit_code = (status >> 8) & 0xff;
-				printk("[program2] : child process exited with code %d\n", exit_code);
+			// 被信号终止
+			sig = termsig;
+			sig_name = get_signal_name(sig);
+			printk("[program2] : get %s signal\n", sig_name);
+			printk("[program2] : child process terminated by signal\n");
+			printk("[program2] : The return signal is %d\n", sig);
+			if (coredump) {
+				printk("[program2] : Core dumped\n");
 			}
 		}
 	}
@@ -127,3 +198,4 @@ static void __exit program2_exit(void){
 
 module_init(program2_init);
 module_exit(program2_exit);
+
