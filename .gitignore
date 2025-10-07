@@ -74,5 +74,5 @@ Thumbs.db
 *.tmp
 *.temp
 
-
-source/bonus/pstree
+image
+*.md
