@@ -76,3 +76,4 @@ Thumbs.db
 
 image
 *.md
+.DS_Store
