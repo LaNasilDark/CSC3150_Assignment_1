@@ -71,7 +71,7 @@ int my_exec(void){
 	const char *const argv[] = {path, NULL, NULL};
 	const char *const envp[] = {"HOME=/", "PATH=/sbin:/user/sbin:/bin:/usr/bin", NULL};
 
-	printk("[program2] : child process\n");
+	// printk("[program2] : child process\n");
 	result = kernel_execve(path, argv, envp);
 
 	if(!result){
@@ -158,12 +158,71 @@ int my_fork(void *argc){
 	}
 	else if(my_WIFSIGNALED(status)){
 		int terminationStatus = my_WTERMSIG(status);
-		printk("[program2] : CHILD EXECUTION FAILED!!\n");
-		if(terminationStatus>=1 && terminationStatus <=15 && processTerminatedSignal[terminationStatus-1]!=NULL){
-			printk("[program2] : child process get %s signal\n", processTerminatedSignal[terminationStatus-1]);
-		}
-		else{
-			printk("[program2] : child process get a signal not in samples\n");
+		printk("[program2] : child process\n");
+		
+		// Provide specific messages for different signals
+		switch(terminationStatus) {
+		case 1:  // SIGHUP
+			printk("[program2] : get SIGHUP signal\n");
+			printk("[program2] : child process is hung up\n");
+			break;
+		case 2:  // SIGINT
+			printk("[program2] : get SIGINT signal\n");
+			printk("[program2] : terminal interrupt\n");
+			break;
+		case 3:  // SIGQUIT
+			printk("[program2] : get SIGQUIT signal\n");
+			printk("[program2] : terminal quit\n");
+			break;
+		case 4:  // SIGILL
+			printk("[program2] : get SIGILL signal\n");
+			printk("[program2] : child process has illegal instruction error\n");
+			break;
+		case 5:  // SIGTRAP
+			printk("[program2] : get SIGTRAP signal\n");
+			printk("[program2] : child process has trap error\n");
+			break;
+		case 6:  // SIGABRT
+			printk("[program2] : get SIGABRT signal\n");
+			printk("[program2] : child process has abort error\n");
+			break;
+		case 7:  // SIGBUS
+			printk("[program2] : get SIGBUS signal\n");
+			printk("[program2] : child process has bus error\n");
+			break;
+		case 8:  // SIGFPE
+			printk("[program2] : get SIGFPE signal\n");
+			printk("[program2] : child process has float error\n");
+			break;
+		case 9:  // SIGKILL
+			printk("[program2] : get SIGKILL signal\n");
+			printk("[program2] : child process is killed\n");
+			break;
+		case 11: // SIGSEGV
+			printk("[program2] : get SIGSEGV signal\n");
+			printk("[program2] : child process has segmentation fault error\n");
+			break;
+		case 13: // SIGPIPE
+			printk("[program2] : get SIGPIPE signal\n");
+			printk("[program2] : child process has pipe error\n");
+			break;
+		case 14: // SIGALRM
+			printk("[program2] : get SIGALRM signal\n");
+			printk("[program2] : child process has alarm error\n");
+			break;
+		case 15: // SIGTERM
+			printk("[program2] : get SIGTERM signal\n");
+			printk("[program2] : child process terminated\n");
+			break;
+		default:
+			if(terminationStatus>=1 && terminationStatus <=15 && processTerminatedSignal[terminationStatus-1]!=NULL){
+				printk("[program2] : get %s signal\n", processTerminatedSignal[terminationStatus-1]);
+			}
+			else{
+				printk("[program2] : child process get a signal not in samples\n");
+			}
+			printk("[program2] : child process terminated\n");
+			break;
 		}
 		printk("[program2] : The return signal is %d\n", terminationStatus);
 	}

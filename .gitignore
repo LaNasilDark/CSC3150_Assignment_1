@@ -28,7 +28,8 @@ source/program2/Module.symvers
 source/program2/modules.order
 source/program2/.*.cmd
 source/program2/test
-
+source/program2/program2_ref.c
+source/program2/program2_copy.c
 # General patterns for C/C++ compilation
 *.o
 *.obj
