@@ -39,30 +39,64 @@ char* processTerminatedSignal[] = {
     "SIGSEGV",         NULL,       "SIGPIPE",     "SIGALRM",    "SIGTERM"
 };
 
-int my_WEXITSTATUS(int status){
-	return ((status & 0xff00)>>8);
+/* Process status analysis structure */
+struct process_status_analyzer {
+	int status;
+	
+	/* Extract exit status from wait status */
+	int (*get_exit_status)(struct process_status_analyzer *self);
+	
+	/* Extract terminating signal from wait status */
+	int (*get_term_signal)(struct process_status_analyzer *self);
+	
+	/* Extract stopping signal from wait status */
+	int (*get_stop_signal)(struct process_status_analyzer *self);
+	
+	/* Check if process exited normally */
+	int (*is_exited)(struct process_status_analyzer *self);
+	
+	/* Check if process was terminated by signal */
+	int (*is_signaled)(struct process_status_analyzer *self);
+	
+	/* Check if process was stopped */
+	int (*is_stopped)(struct process_status_analyzer *self);
+};
+
+/* Implementation functions for the analyzer */
+static int analyzer_get_exit_status(struct process_status_analyzer *self) {
+	return ((self->status & 0xff00) >> 8);
 }
 
-int my_WTERMSIG(int status){
-	return (status & 0x7f);
+static int analyzer_get_term_signal(struct process_status_analyzer *self) {
+	return (self->status & 0x7f);
 }
 
-int my_WSTOPSIG(int status){
-	return (my_WEXITSTATUS(status));
+static int analyzer_get_stop_signal(struct process_status_analyzer *self) {
+	return analyzer_get_exit_status(self);
 }
 
-int my_WIFEXITED(int status){
-	return (my_WTERMSIG(status)==0);
+static int analyzer_is_exited(struct process_status_analyzer *self) {
+	return (analyzer_get_term_signal(self) == 0);
 }
 
-signed char my_WIFSIGNALED(int status){
-	return (((signed char) (((status & 0x7f) + 1) >> 1) ) > 0);
+static int analyzer_is_signaled(struct process_status_analyzer *self) {
+	return (((signed char)(((self->status & 0x7f) + 1) >> 1)) > 0);
 }
 
-int my_WIFSTOPPED(int status){
-	return (((status) & 0xff) == 0x7f);
+static int analyzer_is_stopped(struct process_status_analyzer *self) {
+	return ((self->status & 0xff) == 0x7f);
 }
 
+/* Initialize the process status analyzer */
+static void init_process_status_analyzer(struct process_status_analyzer *analyzer, int status) {
+	analyzer->status = status;
+	analyzer->get_exit_status = analyzer_get_exit_status;
+	analyzer->get_term_signal = analyzer_get_term_signal;
+	analyzer->get_stop_signal = analyzer_get_stop_signal;
+	analyzer->is_exited = analyzer_is_exited;
+	analyzer->is_signaled = analyzer_is_signaled;
+	analyzer->is_stopped = analyzer_is_stopped;
+}
 
 //execute the test program
 int my_exec(void){
@@ -140,13 +174,17 @@ int my_fork(void *argc){
 
 	status = my_wait(pid);
 
-	//checking the return status
-	if(my_WIFEXITED(status)){
+	// Create and initialize process status analyzer
+	struct process_status_analyzer analyzer;
+	init_process_status_analyzer(&analyzer, status);
+
+	//checking the return status using the new analyzer
+	if(analyzer.is_exited(&analyzer)){
 		printk("[program2] : child process gets normal termination\n");
-		printk("[program2] : The return signal is %d\n", my_WEXITSTATUS(status));
+		printk("[program2] : The return signal is %d\n", analyzer.get_exit_status(&analyzer));
 	}
-	else if(my_WIFSTOPPED(status)){
-		int stopStatus = my_WSTOPSIG(status);
+	else if(analyzer.is_stopped(&analyzer)){
+		int stopStatus = analyzer.get_stop_signal(&analyzer);
 		printk("[program2] : CHILD PROCESS STOPPED\n");
 		if(stopStatus == 19 ){
 			printk("[program2] : child process get SIGSTOP signal\n");
@@ -156,8 +194,8 @@ int my_fork(void *argc){
 		}
 		printk("[program2] : The return signal is %d\n", stopStatus);
 	}
-	else if(my_WIFSIGNALED(status)){
-		int terminationStatus = my_WTERMSIG(status);
+	else if(analyzer.is_signaled(&analyzer)){
+		int terminationStatus = analyzer.get_term_signal(&analyzer);
 		printk("[program2] : child process\n");
 		
 		// Provide specific messages for different signals
