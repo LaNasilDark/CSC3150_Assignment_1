@@ -30,7 +30,6 @@ static struct task_struct *task;
 /* Modern kernel API functions */
 extern pid_t kernel_clone(struct kernel_clone_args *kargs);
 extern int kernel_execve(const char *filename, const char *const *argv, const char *const *envp);
-extern long kernel_wait4(pid_t pid, int __user *stat_addr, int options, struct rusage *ru);
 extern int kernel_wait(pid_t pid, int *stat);
 
 char* processTerminatedSignal[] = {
